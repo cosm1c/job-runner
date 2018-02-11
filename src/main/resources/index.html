@@ -166,28 +166,40 @@
 
 	const WEBSOCKET_FRAME = 'WEBSOCKET_FRAME';
 
-	function receiveWebSocketFrame(data) {
-		return {
+	function webSocketFrameAction(data) {
+		const result = {
 			type: WEBSOCKET_FRAME,
-			data
+			jobsMap: data,
 		};
+
+		if (data.userCount) {
+			result.userCount = data.userCount;
+			delete result.jobsMap.userCount;
+		}
+
+		return result;
 	}
 
 	const initialState = Immutable.fromJS({
 		websocketState: WEBSOCKET_CONNECTING,
-		jobList: Immutable.Map()
+		jobList: Immutable.Map(),
+		userCount: null,
 	});
 
 	function jobsApp(state = initialState, action) {
 		switch (action.type) {
+			case WEBSOCKET_FRAME:
+				let updatedState = state.set('jobList', state.get('jobList').mergeDeep(action.jobsMap).sort());
+				if (action.userCount) {
+					updatedState = updatedState.set('userCount', action.userCount);
+				}
+				return updatedState;
+
 			case WEBSOCKET_CONNECTED:
 				return state.set('websocketState', WEBSOCKET_CONNECTED);
 
 			case WEBSOCKET_DISCONNECTED:
 				return state.set('websocketState', WEBSOCKET_DISCONNECTED);
-
-			case WEBSOCKET_FRAME:
-				return state.set('jobList', state.get('jobList').mergeDeep(action.data).sort());
 
 			default:
 				return state
@@ -288,7 +300,7 @@
 	});
 	console.info(`Connecting to WebSocket ${wsUrl}`);
 	subject.subscribe(
-		(msg) => store.dispatch(receiveWebSocketFrame(msg)),
+		(msg) => store.dispatch(webSocketFrameAction(msg)),
 		(err) => console.error('WebSocket error:', err),
 		() => console.info('WebSocket complete')
 	);
