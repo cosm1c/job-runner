@@ -1,0 +1,310 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="x-ua-compatible" content="ie=edge">
+	<title>Job Runner</title>
+	<meta name="description" content="Example Job Runner UI streaming over WebSocket">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+		  integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+	<style>
+		html, body, #app, .main-container {
+			width: 100%;
+			height: 100%;
+		}
+
+		#app .navbar {
+			margin: 0;
+		}
+
+		.main-container {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.navbar-row {
+			flex: 0 0 auto;
+		}
+
+		.joblist-row {
+			flex: 1 1 auto;
+			position: relative;
+			overflow-y: auto;
+			margin-bottom: 0;
+		}
+	</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://unpkg.com/babel-standalone/babel.min.js"></script>
+
+<script src="https://unpkg.com/immutable/dist/immutable.min.js"></script>
+
+<!-- TODO: switch to production build of React
+<script crossorigin src="https://unpkg.com/react@16/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js"></script>
+-->
+<script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+
+<script src="https://unpkg.com/react-bootstrap/dist/react-bootstrap.min.js"></script>
+
+<script src="https://unpkg.com/@reactivex/rxjs/dist/global/Rx.min.js"></script>
+
+<script src="https://unpkg.com/redux/dist/redux.min.js"></script>
+<script src="https://unpkg.com/react-redux/dist/react-redux.min.js"></script>
+
+<script type="text/babel">
+	"use strict";
+
+	// For easier development - not recommended for production
+	const baseUrl = window.location.protocol === 'file:' ? 'http://localhost:8080' : '';
+	const wsUrl = window.location.protocol === 'file:' ? `ws://localhost:8080/ws` : `ws://${window.location.host}/ws`;
+
+	const WEBSOCKET_CONNECTING = 'WEBSOCKET_CONNECTING';
+	const WEBSOCKET_CONNECTED = 'WEBSOCKET_CONNECTED';
+	const WEBSOCKET_DISCONNECTED = 'WEBSOCKET_DISCONNECTED';
+
+	function websocketConnectedAction() {
+		return {
+			type: WEBSOCKET_CONNECTED,
+			date: new Date()
+		};
+	}
+
+	function websocketDisconnectedAction() {
+		return {
+			type: WEBSOCKET_DISCONNECTED,
+			date: new Date()
+		};
+	}
+
+	function WebSocketLabel(props) {
+		const {websocketState} = props;
+		switch (websocketState) {
+			case WEBSOCKET_CONNECTING:
+				return <ReactBootstrap.Label bsStyle="warning">WebSocket Connecting</ReactBootstrap.Label>;
+			case WEBSOCKET_CONNECTED:
+				return <ReactBootstrap.Label bsStyle="info">WebSocket Connected</ReactBootstrap.Label>;
+			case WEBSOCKET_DISCONNECTED:
+				return <ReactBootstrap.Label bsStyle="danger">WebSocket Disconnected</ReactBootstrap.Label>;
+		}
+	}
+
+	const WebSocketLabelView = ReactRedux.connect(
+		state => {
+			return {websocketState: state.get('websocketState')};
+		},
+		//dispatch => dispatch(someAction)
+	)(WebSocketLabel);
+
+
+	function killJob(jobId) {
+		fetch(`${baseUrl}/job/${jobId}`, {method: 'DELETE'})
+			.then(response => console.debug("Kill job - DELETE response:", response))
+			.catch(e => console.error('Failed to kill job', e));
+	}
+
+	function calcPercentage(curr, total) {
+		if (typeof total === 'number' && typeof curr === 'number' && total > 0) {
+			return Math.floor(100 * curr / total);
+		}
+		return null;
+	}
+
+	function JobItem(props) {
+		const {jobInfo} = props;
+		const jobId = jobInfo.get('jobId'),
+			description = jobInfo.get('description'),
+			curr = jobInfo.get('curr'),
+			total = jobInfo.get('total'),
+			error = jobInfo.get('error'),
+			startDateTime = jobInfo.get('startDateTime'),
+			endDateTime = jobInfo.get('endDateTime'),
+			percentage = calcPercentage(curr, total);
+		return (
+			<ReactBootstrap.ListGroupItem header={jobId + ' - ' + description}>
+				<ReactBootstrap.Label bsStyle="info">Started: {startDateTime}</ReactBootstrap.Label>
+				{endDateTime &&
+				<span> <ReactBootstrap.Label bsStyle="info">Completed: {endDateTime}</ReactBootstrap.Label></span>}
+				{error && <span> <ReactBootstrap.Label bsStyle="danger">Failed: {error}</ReactBootstrap.Label></span>}
+				<a onClick={() => killJob(jobId)} className="close align-text-top" href="#">&times;</a>
+				{(typeof percentage === 'number') ?
+					<ReactBootstrap.ProgressBar
+						label={percentage + '%'}
+						active={endDateTime === undefined}
+						now={percentage}/>
+					: (typeof curr !== undefined) ?
+						<ReactBootstrap.ProgressBar
+							label={curr + ' done'}
+							active={endDateTime === undefined}
+							now={100}/>
+						: <ReactBootstrap.ProgressBar/>
+				}
+			</ReactBootstrap.ListGroupItem>
+		);
+	}
+
+	function JobList(props) {
+		const {jobList, className} = props;
+		return (
+			<ReactBootstrap.ListGroup className={className}>
+				{jobList.map((jobInfo) => <JobItem key={jobInfo.get('jobId')} jobInfo={jobInfo}/>).valueSeq()}
+			</ReactBootstrap.ListGroup>
+		);
+	}
+
+	const JobListComponent = ReactRedux.connect(
+		state => {
+			return {jobList: state.get('jobList')};
+		},
+		//dispatch => dispatch(someAction)
+	)(JobList);
+
+	const WEBSOCKET_FRAME = 'WEBSOCKET_FRAME';
+
+	function receiveWebSocketFrame(data) {
+		return {
+			type: WEBSOCKET_FRAME,
+			data
+		};
+	}
+
+	const initialState = Immutable.fromJS({
+		websocketState: WEBSOCKET_CONNECTING,
+		jobList: Immutable.Map()
+	});
+
+	function jobsApp(state = initialState, action) {
+		switch (action.type) {
+			case WEBSOCKET_CONNECTED:
+				return state.set('websocketState', WEBSOCKET_CONNECTED);
+
+			case WEBSOCKET_DISCONNECTED:
+				return state.set('websocketState', WEBSOCKET_DISCONNECTED);
+
+			case WEBSOCKET_FRAME:
+				return state.set('jobList', state.get('jobList').mergeDeep(action.data).sort());
+
+			default:
+				return state
+		}
+	}
+
+	class CreateJobsForm extends React.Component {
+		constructor(props) {
+			super(props);
+			this.state = {
+				description: 'Job Description here',
+				total: 1000
+			};
+
+			this.handleInputChange = this.handleInputChange.bind(this);
+			this.postJobCreate = this.postJobCreate.bind(this);
+		}
+
+		handleInputChange(event) {
+			const target = event.target;
+			const value = target.type === 'checkbox' ? target.checked : target.value;
+			const name = target.name;
+
+			this.setState({[name]: value});
+		}
+
+		static handleFocus(event) {
+			event.target.select();
+		}
+
+		postJobCreate() {
+			fetch(`${baseUrl}/job?description=${this.state.description}&total=${this.state.total}`, {method: 'POST'})
+				.catch(e => console.error('Failed to fetch job list', e));
+		}
+
+		render() {
+			return (
+				<ReactBootstrap.Navbar.Form pullLeft>
+					<ReactBootstrap.FormGroup>
+						<ReactBootstrap.FormControl type="text" placeholder="Description" name="description"
+													value={this.state.description}
+													onChange={this.handleInputChange}
+													onFocus={CreateJobsForm.handleFocus}/>
+						<ReactBootstrap.FormControl type="number" placeholder="Total" name="total"
+													value={this.state.total}
+													onChange={this.handleInputChange}
+													onFocus={CreateJobsForm.handleFocus}/>
+					</ReactBootstrap.FormGroup>{' '}
+					<ReactBootstrap.Button type="submit" onClick={this.postJobCreate}>Create</ReactBootstrap.Button>
+				</ReactBootstrap.Navbar.Form>
+			);
+		}
+	}
+
+
+	const store = Redux.createStore(jobsApp, initialState);
+
+	ReactDOM.render(
+		<ReactRedux.Provider store={store}>
+			<main className="main-container">
+
+				<ReactBootstrap.Navbar className="navbar-row" defaultExpanded>
+					<ReactBootstrap.Navbar.Header>
+						<ReactBootstrap.Navbar.Brand>Job Runner</ReactBootstrap.Navbar.Brand>
+						<ReactBootstrap.Navbar.Toggle/>
+					</ReactBootstrap.Navbar.Header>
+					<ReactBootstrap.Navbar.Collapse>
+						<CreateJobsForm/>
+						<ReactBootstrap.Nav pullRight>
+							<ReactBootstrap.NavItem eventKey={1} href='api-docs/swagger.json'
+													target='_blank'>api-docs/swagger.json</ReactBootstrap.NavItem>
+							<ReactBootstrap.NavItem eventKey={2}><WebSocketLabelView/></ReactBootstrap.NavItem>
+						</ReactBootstrap.Nav>
+					</ReactBootstrap.Navbar.Collapse>
+				</ReactBootstrap.Navbar>
+
+				<JobListComponent className="joblist-row"/>
+
+			</main>
+		</ReactRedux.Provider>,
+		document.querySelector('#app')
+	);
+
+	const subject = Rx.Observable.webSocket({
+		url: wsUrl,
+		openObserver: {
+			next: () => {
+				console.info(`[${new Date().toISOString()}] WebSocket connected`);
+				store.dispatch(websocketConnectedAction());
+			}
+		},
+		closeObserver: {
+			next: () => {
+				console.info(`[${new Date().toISOString()}] WebSocket disconnected`);
+				store.dispatch(websocketDisconnectedAction());
+			}
+		},
+	});
+	console.info(`Connecting to WebSocket ${wsUrl}`);
+	subject.subscribe(
+		(msg) => store.dispatch(receiveWebSocketFrame(msg)),
+		(err) => console.error('WebSocket error:', err),
+		() => console.info('WebSocket complete')
+	);
+
+	/*
+	// Example sending WebSocket frame
+	subject.next(JSON.stringify({op: 'hello'}));
+
+	// Example REST call to populate list
+	fetch(`${baseUrl}/job`)
+		.then(response => response.json())
+		.then(jobInfoArray => jobInfoArray.map(jobInfo => [jobInfo.jobId, jobInfo]))
+		.then(jobsUpdateAction)
+		.then(store.dispatch)
+		.catch(e => console.error('Failed to fetch job list', e));
+    */
+</script>
+</body>
+</html>
