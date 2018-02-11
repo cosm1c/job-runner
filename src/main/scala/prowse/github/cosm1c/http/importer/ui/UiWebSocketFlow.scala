@@ -13,6 +13,8 @@ import scala.concurrent.duration._
 
 object UiWebSocketFlow {
 
+    private final val emptyJson = Json.obj()
+
     private final val keepAliveWebSocketFrame = () => TextMessage.Strict("{}")
 }
 
@@ -20,9 +22,13 @@ class UiWebSocketFlow()(implicit materializer: Materializer) extends JsonProtoco
 
     import UiWebSocketFlow._
 
-    private val (broadcastSink, broadcastSource): (Sink[Json, NotUsed], Source[Json, NotUsed]) =
+    // Could refactor to use Monoid[Json]
+    private val (broadcastSink, broadcastSource): (Sink[Json, NotUsed], Source[(Json, Json), NotUsed]) =
         MergeHub.source[Json](perProducerBufferSize = 1)
-            .conflate(conflateJson)
+            .scan((emptyJson, emptyJson)) {
+                case ((prevState, _), delta) => (conflateJson(prevState, delta), delta)
+            }
+            .conflate(conflateJsonPair)
             .toMat(BroadcastHub.sink(bufferSize = 1))(Keep.both)
             .run()
 
@@ -32,12 +38,20 @@ class UiWebSocketFlow()(implicit materializer: Materializer) extends JsonProtoco
 
         val in: Sink[Any, Future[Done]] = Sink.ignore
 
-        // TODO: use RxJava Subject to provide 1st message, 1st message accumulated from scan(emptyJson)(conflateJson)
+        // TODO: provide immediate snapshot to new subscribers (eg: Monix BehaviorSubject)
         val out: Source[Message, NotUsed] =
             broadcastSource
-                .conflate(conflateJson)
+                .conflate(conflateJsonPair)
                 // Throttle to avoid overloading frontend - increase duration for potentially lower bandwidth
                 .throttle(1, 100.millis, 1, ThrottleMode.Shaping)
+                .prefixAndTail(1)
+                .flatMapConcat { case (head, tail) =>
+                    Source.single(
+                        head.headOption
+                            .map(_._1)
+                            .getOrElse(emptyJson)
+                    ).concat(tail.map(_._2))
+                }
                 .map(circePrinter.pretty)
                 .map(TextMessage.Strict)
                 .keepAlive(55.seconds, keepAliveWebSocketFrame)

@@ -2,13 +2,13 @@ package prowse.github.cosm1c.http.importer
 
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.Json.fromJsonObject
+import io.circe._
 import io.circe.generic.semiauto._
 import io.circe.java8.time.TimeInstances
-import io.circe.{KeyEncoder, _}
 import prowse.github.cosm1c.http.importer.job.JobManagerActor.JobInfo
 
 /*
- * Json maps are trimmed of nulls which make conflation a simple deepMerge.
+ * Json maps are trimmed of nulls which make conflation a deepMerge.
  */
 trait JsonProtocol extends FailFastCirceSupport with TimeInstances {
 
@@ -20,6 +20,10 @@ trait JsonProtocol extends FailFastCirceSupport with TimeInstances {
 
     implicit val jobInfoEncoder: Encoder[JobInfo] = deriveEncoder[JobInfo]
 
+    def conflateJsonPair(curr: (Json, Json), update: (Json, Json)): (Json, Json) =
+        (conflateJson(curr._1, update._2), update._2)
+
+    // TODO: Provide onComplete and onError to downstream and release state
     def conflateJson(curr: Json, update: Json): Json =
         (curr.asObject, update.asObject) match {
             case (Some(lhs), Some(rhs)) =>
@@ -34,5 +38,4 @@ trait JsonProtocol extends FailFastCirceSupport with TimeInstances {
                 if (update.isNull) curr
                 else update
         }
-
 }
