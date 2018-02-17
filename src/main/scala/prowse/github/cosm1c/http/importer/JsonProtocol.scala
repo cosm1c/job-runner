@@ -20,10 +20,12 @@ trait JsonProtocol extends FailFastCirceSupport with TimeInstances {
 
     implicit val jobInfoEncoder: Encoder[JobInfo] = deriveEncoder[JobInfo]
 
-    def conflateJsonPair(curr: (Json, Json), update: (Json, Json)): (Json, Json) =
-        (conflateJson(curr._1, update._2), update._2)
+    def applyJsonDelta(curr: (Json, Json), update: Json): (Json, Json) =
+        (conflateJson(curr._1, update), update)
 
-    // TODO: Provide onComplete and onError to downstream and release state
+    def conflateJsonPair(curr: (Json, Json), update: (Json, Json)): (Json, Json) =
+        (conflateJson(curr._1, update._2), conflateJson(update._1, update._2))
+
     def conflateJson(curr: Json, update: Json): Json =
         (curr.asObject, update.asObject) match {
             case (Some(lhs), Some(rhs)) =>

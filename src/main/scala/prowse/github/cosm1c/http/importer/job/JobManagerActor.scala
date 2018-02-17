@@ -52,6 +52,8 @@ object JobManagerActor {
 
     private case object JobInfoStreamEnd
 
+    private val someZero = Some(0)
+
 }
 
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -91,7 +93,7 @@ class JobManagerActor(uiStreams: UiWebSocketFlow)(implicit materializer: Materia
 
         case CreateJob(description, total) =>
             val jobId = nextJobId
-            val zeroJobInfo = JobInfo(jobId, Some(0), Some(total), Some(LocalDateTime.now()), description = Some(description))
+            val zeroJobInfo = JobInfo(jobId, someZero, Some(total), Some(LocalDateTime.now()), description = Some(description))
 
             val wrappedJobStream: Source[JobInfo, (UniqueKillSwitch, Future[Done])] =
                 jobInfoStream(jobId, zeroJobInfo, total)
@@ -105,10 +107,12 @@ class JobManagerActor(uiStreams: UiWebSocketFlow)(implicit materializer: Materia
                     .recover {
                         case throwable: Throwable =>
                             JobInfo(jobId, endDateTime = Some(LocalDateTime.now()), error = Some(throwable.getMessage))
+                        // TODO: onError substream downstream - remove from global state
                     }
                     .concat(Source.lazily(() => {
                         Source.single(
                             JobInfo(jobId, endDateTime = Some(LocalDateTime.now())))
+                        // TODO: onComplete substream downstream - remove from global state
                     }))
 
             val (killSwitch, eventualDone) = uiStreams.attachSubSource(wrappedJobStream)
@@ -138,7 +142,7 @@ class JobManagerActor(uiStreams: UiWebSocketFlow)(implicit materializer: Materia
 
     private def jobInfoStream(jobId: Long, zeroJobInfo: JobInfo, total: Int): Source[JobInfo, NotUsed] =
         if (total < 0)
-            Source.failed(new RuntimeException("Total < 0"))
+            Source.failed(new IllegalArgumentException("Total < 0"))
         else
             Source.single(zeroJobInfo)
                 .concat(

@@ -127,7 +127,7 @@
 			percentage = calcPercentage(curr, total);
 		return (
 			<ReactBootstrap.ListGroupItem header={jobId + ' - ' + description}>
-				<ReactBootstrap.Label bsStyle="info">Started: {startDateTime}</ReactBootstrap.Label>
+				{startDateTime && <ReactBootstrap.Label bsStyle="info">Started: {startDateTime}</ReactBootstrap.Label>}
 				{endDateTime &&
 				<span> <ReactBootstrap.Label bsStyle="info">Completed: {endDateTime}</ReactBootstrap.Label></span>}
 				{error && <span> <ReactBootstrap.Label bsStyle="danger">Failed: {error}</ReactBootstrap.Label></span>}
@@ -137,7 +137,7 @@
 						label={percentage + '%'}
 						active={endDateTime === undefined}
 						now={percentage}/>
-					: (typeof curr !== undefined) ?
+					: (typeof curr !== 'undefined') ?
 						<ReactBootstrap.ProgressBar
 							label={curr + ' done'}
 							active={endDateTime === undefined}

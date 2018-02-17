@@ -24,6 +24,9 @@ lazy val root = (project in file("."))
       "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.12.0",
       "ch.megard" %% "akka-http-cors" % "0.2.2",
 
+      "io.projectreactor" % "reactor-core" % "3.1.4.RELEASE",
+      "io.projectreactor.addons" % "reactor-adapter" % "3.1.5.RELEASE",
+
       "org.typelevel" %% "cats-core" % "1.0.1",
 
       "de.heikoseeberger" %% "akka-http-circe" % "1.19.0",

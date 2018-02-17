@@ -57,6 +57,52 @@ class JsonProtocolTest extends FlatSpec {
         )
     }
 
+    it should "recurse merge sub trees" in {
+        assert(
+            protocol.conflateJson(
+                Json.fromFields(Seq(
+                    "parent" -> Json.fromFields(Seq(
+                        "a" -> Json.fromInt(1)
+                    ))
+                )),
+                Json.fromFields(Seq(
+                    "parent" -> Json.fromFields(Seq(
+                        "b" -> Json.fromInt(2)
+                    ))
+                ))
+            ) == Json.fromFields(Seq(
+                "parent" -> Json.fromFields(Seq(
+                    "a" -> Json.fromInt(1),
+                    "b" -> Json.fromInt(2)
+                ))
+            ))
+        )
+    }
+
+    it should "recurse merge sub trees ignoring nulls" in {
+        assert(
+            protocol.conflateJson(
+                Json.fromFields(Seq(
+                    "parent" -> Json.fromFields(Seq(
+                        "a" -> Json.fromInt(1),
+                        "b" -> Json.Null
+                    ))
+                )),
+                Json.fromFields(Seq(
+                    "parent" -> Json.fromFields(Seq(
+                        "a" -> Json.Null,
+                        "b" -> Json.fromInt(2)
+                    ))
+                ))
+            ) == Json.fromFields(Seq(
+                "parent" -> Json.fromFields(Seq(
+                    "a" -> Json.fromInt(1),
+                    "b" -> Json.fromInt(2)
+                ))
+            ))
+        )
+    }
+
     it should "ignore nulls" in {
         assertPreserves(Json.fromInt(1), Json.Null)
     }
