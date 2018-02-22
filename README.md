@@ -12,6 +12,12 @@ Tech Stack:
 * [Project Reactor](https://projectreactor.io/)
 * [Circe](https://circe.github.io/circe/)
 * [Swagger](https://swagger.io/)
+* [Babel](https://babeljs.io/)
+* [Immutable JS](https://facebook.github.io/immutable-js/)
+* [React JS](https://reactjs.org/)
+* [React-BootStrap](https://react-bootstrap.github.io/)
+* [RxJS](http://reactivex.io/rxjs/)
+* [Redux JS](https://redux.js.org/)
 
 
 ## SBT Development Environment ##
