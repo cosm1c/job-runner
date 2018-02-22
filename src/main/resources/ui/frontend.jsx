@@ -41,6 +41,18 @@ const WebSocketLabelView = ReactRedux.connect(
 //dispatch => dispatch(someAction)
 )(WebSocketLabel);
 
+function UserCountLabel(props) {
+  const {userCount} = props;
+  return userCount && <ReactBootstrap.Label bsStyle="info">Users: {userCount}</ReactBootstrap.Label>;
+}
+
+const UserCountLabelView = ReactRedux.connect(
+  state => {
+    return {userCount: state.getIn(['wsState', 'userCount'], 0)};
+  },
+//dispatch => dispatch(someAction)
+)(UserCountLabel);
+
 
 function killJob(jobId) {
   fetch(`${baseUrl}/job/${jobId}`, {method: 'DELETE'})
@@ -92,7 +104,9 @@ function JobList(props) {
   const {wsState, className} = props;
   return (
     <ReactBootstrap.ListGroup className={className}>
-      {wsState.map((jobInfo) => <JobItem key={jobInfo.get('jobId')} jobInfo={jobInfo}/>).valueSeq()}
+      {wsState
+        .filter((value, key) => !isNaN(key))
+        .map(jobInfo => <JobItem key={jobInfo.get('jobId')} jobInfo={jobInfo}/>).valueSeq()}
     </ReactBootstrap.ListGroup>
   );
 }
@@ -237,6 +251,7 @@ ReactDOM.render(
             <ReactBootstrap.NavItem eventKey={1} href='api-docs/swagger.json'
                                     target='_blank'>api-docs/swagger.json</ReactBootstrap.NavItem>
             <ReactBootstrap.NavItem eventKey={2}><WebSocketLabelView/></ReactBootstrap.NavItem>
+            <ReactBootstrap.NavItem eventKey={3}><UserCountLabelView/></ReactBootstrap.NavItem>
           </ReactBootstrap.Nav>
         </ReactBootstrap.Navbar.Collapse>
       </ReactBootstrap.Navbar>

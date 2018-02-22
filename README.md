@@ -9,6 +9,8 @@ Tech Stack:
 * [Scala 2.12](https://www.scala-lang.org/)
 * [Akka](http://akka.io/) with [Akka Streams](http://doc.akka.io/docs/akka/current/scala/stream/index.html)
  and [Akka HTTP](http://doc.akka.io/docs/akka-http/current/scala/http/index.html)
+* [Project Reactor](https://projectreactor.io/)
+* [Circe](https://circe.github.io/circe/)
 * [Swagger](https://swagger.io/)
 
 

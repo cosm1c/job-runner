@@ -27,8 +27,6 @@ lazy val root = (project in file("."))
       "io.projectreactor" % "reactor-core" % "3.1.4.RELEASE",
       "io.projectreactor.addons" % "reactor-adapter" % "3.1.5.RELEASE",
 
-      "org.typelevel" %% "cats-core" % "1.0.1",
-
       "de.heikoseeberger" %% "akka-http-circe" % "1.19.0",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,

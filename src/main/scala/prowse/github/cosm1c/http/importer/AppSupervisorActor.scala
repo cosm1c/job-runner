@@ -25,7 +25,7 @@ class AppSupervisorActor extends Actor with ActorLogging {
     private val httpPort = config.getInt("app.httpPort")
 
     private val uiStreams = new UiWebSocketFlow()
-    private val uiRoutes = new UiRoutes(uiStreams)
+    private val uiRoutes = new UiRoutes(uiStreams)(context.dispatcher, log)
     private val jobManagerActor = context.actorOf(JobManagerActor.props(uiStreams), "JobManagerActor")
 
     private val route: Route =
