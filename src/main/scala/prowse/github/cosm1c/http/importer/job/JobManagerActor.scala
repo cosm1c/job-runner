@@ -56,6 +56,7 @@ object JobManagerActor {
 
 }
 
+// TODO: Use TypedActor when its production ready
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 class JobManagerActor(uiStreams: UiWebSocketFlow)(implicit materializer: Materializer) extends Actor with JsonProtocol with ActorLogging {
 
@@ -107,15 +108,13 @@ class JobManagerActor(uiStreams: UiWebSocketFlow)(implicit materializer: Materia
                     .recover {
                         case throwable: Throwable =>
                             JobInfo(jobId, endDateTime = Some(LocalDateTime.now()), error = Some(throwable.getMessage))
-                        // TODO: onError substream downstream - remove from global state
                     }
                     .concat(Source.lazily(() => {
                         Source.single(
                             JobInfo(jobId, endDateTime = Some(LocalDateTime.now())))
-                        // TODO: onComplete substream downstream - remove from global state
                     }))
 
-            val (killSwitch, eventualDone) = uiStreams.attachSubSource(wrappedJobStream)
+            val (killSwitch, eventualDone) = uiStreams.attachSubSource(jobId.toString, wrappedJobStream)
 
             eventualDone.onComplete {
                 case Success(_) =>

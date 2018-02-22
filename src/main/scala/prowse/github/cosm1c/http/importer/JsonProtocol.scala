@@ -7,37 +7,41 @@ import io.circe.generic.semiauto._
 import io.circe.java8.time.TimeInstances
 import prowse.github.cosm1c.http.importer.job.JobManagerActor.JobInfo
 
-/*
- * Json maps are trimmed of nulls which make conflation a deepMerge.
- */
 trait JsonProtocol extends FailFastCirceSupport with TimeInstances {
 
-    implicit val circePrinter: Printer = Printer.noSpaces.copy(dropNullValues = true)
+    implicit val circePrinter: Printer = Printer.noSpaces //.copy(dropNullValues = true)
 
-    implicit val jobInfoKeyEncoder: KeyEncoder[JobInfo] = _.jobId.toString
 
     implicit val jobInfoDecoder: Decoder[JobInfo] = deriveDecoder[JobInfo]
 
-    implicit val jobInfoEncoder: Encoder[JobInfo] = deriveEncoder[JobInfo]
+    implicit val jobInfoEncoder: Encoder[JobInfo] =
+        deriveEncoder[JobInfo]
+            // This could be recursive
+            .mapJsonObject(_.filter(!_._2.isNull))
 
-    def applyJsonDelta(curr: (Json, Json), update: Json): (Json, Json) =
-        (conflateJson(curr._1, update), update)
 
-    def conflateJsonPair(curr: (Json, Json), update: (Json, Json)): (Json, Json) =
-        (conflateJson(curr._1, update._2), conflateJson(update._1, update._2))
+    def conflateJsonKeepNulls(state: Json, delta: Json): Json =
+        state.deepMerge(delta)
 
-    def conflateJson(curr: Json, update: Json): Json =
-        (curr.asObject, update.asObject) match {
+    def conflateJsonDropNulls(state: Json, delta: Json): Json =
+        (state.asObject, delta.asObject) match {
             case (Some(lhs), Some(rhs)) =>
                 fromJsonObject(
-                    lhs.toList.foldLeft(rhs.filter(!_._2.isNull)) {
+                    lhs.toList.foldLeft(rhs) {
                         case (acc, (key, value)) =>
-                            rhs(key).fold(acc.add(key, value)) { r => acc.add(key, conflateJson(value, r)) }
+                            rhs(key).fold(acc.add(key, value)) { r =>
+                                if (r.isNull) acc.remove(key)
+                                else acc.add(key, conflateJsonDropNulls(value, r))
+                            }
                     }
                 )
-
-            case _ =>
-                if (update.isNull) curr
-                else update
+            case _ => delta
         }
+
+    def applyJsonDelta(state: (Json, Json), delta: Json): (Json, Json) =
+        (conflateJsonDropNulls(state._1, delta), delta)
+
+    def conflateJsonPair(state: (Json, Json), delta: (Json, Json)): (Json, Json) =
+        (conflateJsonDropNulls(state._1, delta._2), conflateJsonKeepNulls(state._2, delta._2))
+
 }

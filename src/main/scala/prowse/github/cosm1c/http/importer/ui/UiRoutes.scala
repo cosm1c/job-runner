@@ -6,14 +6,9 @@ class UiRoutes(uiWebSocketFlow: UiWebSocketFlow) extends Directives {
 
     val route: Route =
         pathEndOrSingleSlash {
-
-            getFromResource("index.html")
-
-            // For multiple files see: getFromResourceDirectory
-
+            getFromResource("ui/index.html")
         } ~ path("ws") {
             handleWebSocketMessages(uiWebSocketFlow.clientWebSocketFlow)
-        }
-
+        } ~ getFromResourceDirectory("ui")
 
 }
